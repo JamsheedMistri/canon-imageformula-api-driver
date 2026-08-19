@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "canon-r10-api-driver"
+version = "0.1.0"
+description = "Userspace driver and HTTP API for the Canon imageFORMULA R10 portable scanner (CaptureOnTouch-exact quality)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "canon-imageformula-api-driver contributors" }]
+keywords = ["canon", "imageformula", "r10", "scanner", "usb", "libusb", "sane"]
+
+dependencies = [
+    "pillow>=10.0.0",
+    "numpy>=1.26.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+]
+
+[project.optional-dependencies]
+# capstone powers the reverse-engineering tools (tools/disasm_macho.py etc.)
+re = ["capstone>=5.0"]
+dev = ["pytest>=8.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+r10 = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

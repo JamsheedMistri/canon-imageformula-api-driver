@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.DS_Store
+
+# Local-only material, NOT for the public repo. The entire captures/ directory
+# is private: ground-truth scans, device dumps, Canon's proprietary onboard
+# app/binaries (reverse-engineering source material), and our own private index
+# (captures/README.md). To the public repo, captures/ does not exist.
+# The one reverse-engineered artifact the product needs is committed separately
+# as src/r10/data/cot_sequence.json (our own derived command data).
+/captures/
+
+# Vendor / binary artifacts (belt-and-suspenders; these live under captures/)
+*.exe
+*.dll
+*.dylib
+*.bin
+*.pcap
+*.pcapng
+*.pdf
+*.png
+!docs/**/*.png
+out.pdf

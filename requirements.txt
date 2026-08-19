@@ -1,0 +1,8 @@
+pillow>=10.0.0
+numpy>=1.26.0
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+# reverse-engineering tools (tools/disasm_macho.py, tools/trace_calls.py)
+capstone>=5.0
+# tests
+pytest>=8.0.0
