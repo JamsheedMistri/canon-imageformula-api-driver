@@ -50,6 +50,11 @@ curl -X POST 'http://127.0.0.1:8080/release'   # remount volume for CaptureOnTou
   holds 10) and returns the document in the response body. `pdf` (default)
   and `tiff` combine all pages into one file; `png`/`jpeg` return the bare
   image for one page or a ZIP of `page_NN` files for several.
+- **Scans start near-instantly**: the service keeps the scanner's AGC
+  calibration warm in the background (at startup and every `--calib-interval`
+  seconds, default 300), so `/scan` skips the ~60-90 s per-scan calibration
+  preamble. `?calibration=full` forces the complete per-scan choreography;
+  see `docs/protocol.md` 6.7.4.
 - `GET /status` reports device identity and whether paper is loaded.
 - `POST /release` remounts the volume so CaptureOnTouch can be used; the next
   API request reclaims the device automatically.

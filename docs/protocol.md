@@ -8,21 +8,21 @@ software. Treat "inferred" rows as hypotheses to validate in Phase 2/4.
 
 Observed via `ioreg -p IOUSB -l` and `lsusb -v` (sane-devel archive) on this unit:
 
-| Field | Value |
-|---|---|
-| Product string | `CANON   R10` (note the padding spaces) |
-| `idVendor` | `0x1083` (Canon Electronics, Inc.) |
-| `idProduct` | `0x167f` |
-| `bcdDevice` | `2.02` |
-| `bDeviceClass` | `0` (per-interface) |
-| `bNumConfigurations` | `1` |
-| `bNumInterfaces` | `1` |
-| `bInterfaceClass` | `8` (Mass Storage) |
-| `bInterfaceSubClass` | `6` (SCSI transparent command set) |
-| `bInterfaceProtocol` | `80` / `0x50` (Bulk-Only Transport) |
-| Bulk IN endpoint | `0x81`, 512-byte max packet |
-| Bulk OUT endpoint | `0x02`, 512-byte max packet |
-| Power | Bus powered, 500 mA |
+| Field                | Value                                   |
+| -------------------- | --------------------------------------- |
+| Product string       | `CANON   R10` (note the padding spaces) |
+| `idVendor`           | `0x1083` (Canon Electronics, Inc.)      |
+| `idProduct`          | `0x167f`                                |
+| `bcdDevice`          | `2.02`                                  |
+| `bDeviceClass`       | `0` (per-interface)                     |
+| `bNumConfigurations` | `1`                                     |
+| `bNumInterfaces`     | `1`                                     |
+| `bInterfaceClass`    | `8` (Mass Storage)                      |
+| `bInterfaceSubClass` | `6` (SCSI transparent command set)      |
+| `bInterfaceProtocol` | `80` / `0x50` (Bulk-Only Transport)     |
+| Bulk IN endpoint     | `0x81`, 512-byte max packet             |
+| Bulk OUT endpoint    | `0x02`, 512-byte max packet             |
+| Power                | Bus powered, 500 mA                     |
 
 The device always enumerates as **USB Mass Storage**. Unlike the Canon P-208 /
 P-215 (which have a physical mode switch that re-enumerates them as a native
@@ -78,14 +78,14 @@ literal LBA on the FAT volume).
 Interpretation: the high-level API issues **SCSI CDBs** and branches on the
 returned **SCSI sense data**. `ExecRead` / `ExecWrite` / `ExecNone` correspond
 to the three data directions (device->host, host->device, no data). But the
-*low-level delivery* is NOT raw SCSI passthrough - see section 3.2: the CDB is
+_low-level delivery_ is NOT raw SCSI passthrough - see section 3.2: the CDB is
 wrapped in a command block and written to `INDATA.dat`, with the response read
 from `transfer.dat`.
 
 ## 3.2 Low-level command framing (CONFIRMED from ONTOUCHL.exe disassembly)
 
 Disassembling the scanner's bundled Windows launcher `ONTOUCHL.exe` pins
-down exactly how `CCeiFileIOLite` implements the Exec* calls. It does **not**
+down exactly how `CCeiFileIOLite` implements the Exec\* calls. It does **not**
 use `DeviceIoControl`/`SCSI_PASS_THROUGH`; it uses `CreateFileW` + overlapped,
 unbuffered `ReadFile`/`WriteFile` on the two pipe files of the removable volume.
 
@@ -117,15 +117,15 @@ dword at offset `0x18` to `0xFFFFFFFF`. After the write, the host re-reads
 `ExecRead` (VA `0x4026c0`) / the shared builder (`0x402ff0`) build this 28-byte
 command block and write it to `transfer.dat`:
 
-| Offset | Value | Meaning |
-|---|---|---|
-| `0x00` | `0x00` | (zero) |
-| `0x03` | `0x14` | constant (also = response data offset, 20) |
-| `0x05` | `0x01` | constant |
-| `0x06` | `0x90` | constant |
-| `0x0C`..`0x17` | SCSI CDB | the CDB, **max 12 bytes** (enforced: `cmp cdb_len, 0xc; ja error`) |
-| `0x18` | `0xFFFFFFFF` | status/completion dword (firmware overwrites it) |
-| rest | `0x00` | zero-filled to the sector/transfer size |
+| Offset         | Value        | Meaning                                                            |
+| -------------- | ------------ | ------------------------------------------------------------------ |
+| `0x00`         | `0x00`       | (zero)                                                             |
+| `0x03`         | `0x14`       | constant (also = response data offset, 20)                         |
+| `0x05`         | `0x01`       | constant                                                           |
+| `0x06`         | `0x90`       | constant                                                           |
+| `0x0C`..`0x17` | SCSI CDB     | the CDB, **max 12 bytes** (enforced: `cmp cdb_len, 0xc; ja error`) |
+| `0x18`         | `0xFFFFFFFF` | status/completion dword (firmware overwrites it)                   |
+| rest           | `0x00`       | zero-filled to the sector/transfer size                            |
 
 The whole buffer is zeroed first (`memset(buf, 0, this[0x7c])`), then the fields
 above are set. The write is sector-aligned (`len = (len + 0x1ff) & ~0x1ff`).
@@ -150,19 +150,19 @@ what the transport does now.)
 
 `this` (the `CCeiFileIOLite` object) field map recovered from the code:
 
-| Field | Meaning |
-|---|---|
-| `+0x04` | `INDATA.dat` file handle (command write) |
-| `+0x08` | `transfer.dat` file handle (response read) |
-| `+0x0C` | command buffer |
-| `+0x10` | response buffer |
-| `+0x18` (in cmd block) | `0xFFFFFFFF` |
-| `+0x40` | "device open" flag |
-| `+0x44` | max response length |
-| `+0x58` | last error code (e.g. `0x80fe0002`, `0x80ff0000|winerr`) |
-| `+0x5C` | `CRITICAL_SECTION` guarding each Exec |
-| `+0x74` | OVERLAPPED event handle |
-| `+0x7C` | command-buffer size |
+| Field                  | Meaning                                         |
+| ---------------------- | ----------------------------------------------- | -------- |
+| `+0x04`                | `INDATA.dat` file handle (command write)        |
+| `+0x08`                | `transfer.dat` file handle (response read)      |
+| `+0x0C`                | command buffer                                  |
+| `+0x10`                | response buffer                                 |
+| `+0x18` (in cmd block) | `0xFFFFFFFF`                                    |
+| `+0x40`                | "device open" flag                              |
+| `+0x44`                | max response length                             |
+| `+0x58`                | last error code (e.g. `0x80fe0002`, `0x80ff0000 | winerr`) |
+| `+0x5C`                | `CRITICAL_SECTION` guarding each Exec           |
+| `+0x74`                | OVERLAPPED event handle                         |
+| `+0x7C`                | command-buffer size                             |
 
 ### 3.3 macOS filesystem-pipe test result (CONFIRMED)
 
@@ -229,6 +229,7 @@ ReadToArchiveProcess(unsigned int, CArchiveCore*)
 ```
 
 This confirms the driver design directly:
+
 1. `ExecRead/ExecWrite/ExecNone(cdb, cdb_len, data, data_len)` is a plain SCSI
    CDB pass-through - exactly our `bot.transfer()` signature.
 2. `ExecRequestSense(key, buf, len)` matches our REQUEST SENSE handling.
@@ -246,24 +247,24 @@ an optional data phase, then a 13-byte Command Status Wrapper (CSW) on EP
 
 CBW (little-endian):
 
-| Offset | Size | Field | Notes |
-|---|---|---|---|
-| 0 | 4 | dCBWSignature | `0x43425355` ("USBC") |
-| 4 | 4 | dCBWTag | echoed back in CSW |
-| 8 | 4 | dCBWDataTransferLength | bytes in data phase |
-| 12 | 1 | bmCBWFlags | `0x80` = IN (dev->host), `0x00` = OUT |
-| 13 | 1 | bCBWLUN | low nibble, `0` |
-| 14 | 1 | bCBWCBLength | valid bytes of CDB (1-16) |
-| 15 | 16 | CBWCB | the SCSI CDB |
+| Offset | Size | Field                  | Notes                                 |
+| ------ | ---- | ---------------------- | ------------------------------------- |
+| 0      | 4    | dCBWSignature          | `0x43425355` ("USBC")                 |
+| 4      | 4    | dCBWTag                | echoed back in CSW                    |
+| 8      | 4    | dCBWDataTransferLength | bytes in data phase                   |
+| 12     | 1    | bmCBWFlags             | `0x80` = IN (dev->host), `0x00` = OUT |
+| 13     | 1    | bCBWLUN                | low nibble, `0`                       |
+| 14     | 1    | bCBWCBLength           | valid bytes of CDB (1-16)             |
+| 15     | 16   | CBWCB                  | the SCSI CDB                          |
 
 CSW:
 
-| Offset | Size | Field | Notes |
-|---|---|---|---|
-| 0 | 4 | dCSWSignature | `0x53425355` ("USBS") |
-| 4 | 4 | dCSWTag | must equal CBW tag |
-| 8 | 4 | dCSWDataResidue | undelivered byte count |
-| 12 | 1 | bCSWStatus | `0`=pass, `1`=fail, `2`=phase error |
+| Offset | Size | Field           | Notes                               |
+| ------ | ---- | --------------- | ----------------------------------- |
+| 0      | 4    | dCSWSignature   | `0x53425355` ("USBS")               |
+| 4      | 4    | dCSWTag         | must equal CBW tag                  |
+| 8      | 4    | dCSWDataResidue | undelivered byte count              |
+| 12     | 1    | bCSWStatus      | `0`=pass, `1`=fail, `2`=phase error |
 
 On `bCSWStatus == 1` we issue `REQUEST SENSE` (0x03) to read the sense key /
 ASC / ASCQ, exactly as the binary does.
@@ -273,15 +274,15 @@ ASC / ASCQ, exactly as the binary does.
 An early USB/BOT hardware probe, run **as root** on macOS, successfully claimed
 the interface and exchanged real SCSI. Confirmed:
 
-| Command | Result |
-|---|---|
-| Claim interface 0 | Works, but **only as root** on macOS (see below) |
-| INQUIRY (0x12) | type `0x00`, vendor `CANON`, product `R10`, rev `2.02` |
-| TEST UNIT READY (0x00) | ready |
-| REQUEST SENSE (0x03) | key `0x00` asc `0x00` ascq `0x00` (no error) |
-| READ CAPACITY(10) (0x25) | last LBA `16383`, block `512` -> **8 MB LUN 0** |
-| READ(10) LBA 0 | valid FAT16 **MBR**: partition type `0x04`, start LBA `63`, ~6 MB |
-| READ(10) LBA 538624 | **STALL / pipe error** |
+| Command                  | Result                                                            |
+| ------------------------ | ----------------------------------------------------------------- |
+| Claim interface 0        | Works, but **only as root** on macOS (see below)                  |
+| INQUIRY (0x12)           | type `0x00`, vendor `CANON`, product `R10`, rev `2.02`            |
+| TEST UNIT READY (0x00)   | ready                                                             |
+| REQUEST SENSE (0x03)     | key `0x00` asc `0x00` ascq `0x00` (no error)                      |
+| READ CAPACITY(10) (0x25) | last LBA `16383`, block `512` -> **8 MB LUN 0**                   |
+| READ(10) LBA 0           | valid FAT16 **MBR**: partition type `0x04`, start LBA `63`, ~6 MB |
+| READ(10) LBA 538624      | **STALL / pipe error**                                            |
 
 Key conclusions:
 
@@ -334,27 +335,27 @@ SCSI-2 scanner spec; the vendor ones (`GetScannerStatus`, `GetScanMode`,
 whose exact byte values are not printed in the name table (the enum-index-to-
 opcode map lives in the dispatcher and needs deeper RE or a capture).
 
-| Name | Std opcode | Dir | Purpose |
-|---|---|---|---|
-| TestUnitReady | `0x00` | none | is the scanner ready |
-| RequestSense | `0x03` | in | read sense data after a failure |
-| Inquiry | `0x12` | in | vendor/product/firmware id (CONFIRMED live) |
-| ModeSelect | `0x15` | out | set options |
-| ReserveUnit | `0x16` | none | claim the unit |
-| ReleaseUnit | `0x17` | none | release the unit |
-| ModeSense | `0x1a` | in | read options |
-| Scan | `0x1b` | none | begin a scan / feed a page |
-| Diagnostic | `0x1d` | out | SEND DIAGNOSTIC |
-| SetWindow | `0x24` | out | set window: dpi, mode, duplex, geometry |
-| GetWindow | `0x25` | in | read window descriptor |
-| Read | `0x28` | in | read image data |
-| Send | `0x2a` | out | send data |
-| ObjectPosition | `0x31` | none | feed / eject a page (ADF) |
-| GetScannerStatus | vendor | in | bytes available / feed / hopper status |
-| GetScanMode | vendor | in | current scan mode |
-| DefineScanMode | vendor | out | define scan mode |
-| StopBatch | vendor | none | stop the batch/feed |
-| Set/GetFunctionKey | vendor | in/out | panel key state |
+| Name               | Std opcode | Dir    | Purpose                                     |
+| ------------------ | ---------- | ------ | ------------------------------------------- |
+| TestUnitReady      | `0x00`     | none   | is the scanner ready                        |
+| RequestSense       | `0x03`     | in     | read sense data after a failure             |
+| Inquiry            | `0x12`     | in     | vendor/product/firmware id (CONFIRMED live) |
+| ModeSelect         | `0x15`     | out    | set options                                 |
+| ReserveUnit        | `0x16`     | none   | claim the unit                              |
+| ReleaseUnit        | `0x17`     | none   | release the unit                            |
+| ModeSense          | `0x1a`     | in     | read options                                |
+| Scan               | `0x1b`     | none   | begin a scan / feed a page                  |
+| Diagnostic         | `0x1d`     | out    | SEND DIAGNOSTIC                             |
+| SetWindow          | `0x24`     | out    | set window: dpi, mode, duplex, geometry     |
+| GetWindow          | `0x25`     | in     | read window descriptor                      |
+| Read               | `0x28`     | in     | read image data                             |
+| Send               | `0x2a`     | out    | send data                                   |
+| ObjectPosition     | `0x31`     | none   | feed / eject a page (ADF)                   |
+| GetScannerStatus   | vendor     | in     | bytes available / feed / hopper status      |
+| GetScanMode        | vendor     | in     | current scan mode                           |
+| DefineScanMode     | vendor     | out    | define scan mode                            |
+| StopBatch          | vendor     | none   | stop the batch/feed                         |
+| Set/GetFunctionKey | vendor     | in/out | panel key state                             |
 
 > Standard opcodes are confirmed by name; the exact CDB byte layouts (esp.
 > `SetWindow`'s window descriptor block) and the vendor opcode values still need
@@ -389,7 +390,7 @@ correlate as strongly as adjacent pixels.)
 Output is severely underexposed (paper ~ 40/255) with visible per-pixel
 vertical streaking - the classic signature of a CIS sensor with **no shading
 correction** and no gamma applied. Autocontrast recovers a readable image;
-real calibration is the top open item (section 7).
+the real calibration protocol was recovered later (6.5-6.7).
 
 ### 6.2 READ termination semantics (confirmed on hardware)
 
@@ -397,7 +398,7 @@ The image ends with exactly this signature (observed live):
 
 1. **Final short strip**: CHECK CONDITION, sense `f0 00 20 00 <residue:4> 06 ...`
    - key 0x00 (NO SENSE) with **ILI (0x20)** set and the Information field
-   (bytes 3-6) holding the residue. Valid bytes = requested - residue.
+     (bytes 3-6) holding the residue. Valid bytes = requested - residue.
 2. **Any READ after that**: CHECK CONDITION, sense key **0x05 ILLEGAL
    REQUEST, asc 0x2c (command sequence error)** - the scan session is over
    and READ is no longer a legal command. No data is transferred (the
@@ -515,15 +516,15 @@ This matches the 28-byte block we already drive over the raw pipe.
 
 ### Commands used by calibration (opcodes confirmed in the disassembly)
 
-| Exec fn | opcode | CDB layout | purpose |
-|---|---|---|---|
-| `ExecGetMemory(addr,len,buf)` | **0x3B** | `3B 00 [addr BE32 @2] [len BE24 @6] 00` | read device memory (same as archive read); chunked at 0x2000 |
-| `ExecSetAdjustData(front,back)` | **0xE1** | `E1 00 00 00 00 03 00 00 28 ...` + 52-B data-out | **write analog gain/offset registers** |
-| `ExecSetWindow` | 0x24 | standard SET WINDOW | scan window |
-| `ExecScan` / `ExecRead` | 0x1B / 0x28 | standard | feed + read strips |
-| `ExecSend` | 0x2A | `2A 00 8C ...` | send tables (e.g. shading) |
-| `ExecDefineScanMode` | 0xE-reg writes | data-out header `00 00 00 1C 00 02 B0 00`, regs 0xE30/0xE32/0xE36 | scan-mode registers |
-| `Get/SetShadingData` | - | via `__CFData` | shading table exchange |
+| Exec fn                         | opcode         | CDB layout                                                        | purpose                                                      |
+| ------------------------------- | -------------- | ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| `ExecGetMemory(addr,len,buf)`   | **0x3B**       | `3B 00 [addr BE32 @2] [len BE24 @6] 00`                           | read device memory (same as archive read); chunked at 0x2000 |
+| `ExecSetAdjustData(front,back)` | **0xE1**       | `E1 00 00 00 00 03 00 00 28 ...` + 52-B data-out                  | **write analog gain/offset registers**                       |
+| `ExecSetWindow`                 | 0x24           | standard SET WINDOW                                               | scan window                                                  |
+| `ExecScan` / `ExecRead`         | 0x1B / 0x28    | standard                                                          | feed + read strips                                           |
+| `ExecSend`                      | 0x2A           | `2A 00 8C ...`                                                    | send tables (e.g. shading)                                   |
+| `ExecDefineScanMode`            | 0xE-reg writes | data-out header `00 00 00 1C 00 02 B0 00`, regs 0xE30/0xE32/0xE36 | scan-mode registers                                          |
+| `Get/SetShadingData`            | -              | via `__CFData`                                                    | shading table exchange                                       |
 
 ### Calibration flow (`CCanoDR::AdjustLight`)
 
@@ -543,6 +544,7 @@ This matches the 28-byte block we already drive over the raw pipe.
    79 (0x4F) is the register pivot; the step is a one-shot feedback solve so the
    reference max lands on `target`. Result is cached and only recomputed when the
    window/mode changes.
+
 4. `ExecSetAdjustData(0xE1)` writes the gain+offset registers to the sensor
    (front+back, 20-byte `SAdjustInfo` each: bytes [0..2]=gain RGB, [4..6]=offset
    RGB, words [8],[0xA],[0xC] big-endian = per-color aux).
@@ -572,7 +574,7 @@ Rather than reimplement these from disassembly (guesswork), we call Canon's
 actual code:
 
 - The module is x86_64; it loads fine under **Rosetta** (`arch -x86_64
-  /usr/bin/python3` + ctypes). VALIDATED.
+/usr/bin/python3` + ctypes). VALIDATED.
 - Its install names are `@executable_path/...`-relative; `tools/setup_llipm.sh`
   copies `pafcv2`, `rdd20`, `LLiPmDRP215` to `/tmp/cotfw/`, rewrites the
   references to absolute paths (`install_name_tool`) and ad-hoc re-signs them.
@@ -581,18 +583,18 @@ actual code:
 - `tagCEIIMAGEINFO` (every function's image descriptor), recovered from
   `_GetHistogram` / `to_gray_image` / `_IsGrayImage` disassembly:
 
-  | off  | type | meaning                                    |
-  |------|------|--------------------------------------------|
-  | 0x00 | u64  | struct/header size = 0x68                  |
-  | 0x08 | u64  | pixel data pointer                         |
-  | 0x20 | u64  | width (pixels)                             |
-  | 0x28 | u64  | height (lines)                             |
-  | 0x30 | u64  | bytes per line (stride)                    |
-  | 0x38 | u64  | total buffer length (bytes)                |
-  | 0x40 | u64  | bits/sample context (x bpp compared to 7)  |
-  | 0x48 | u64  | bytes per pixel (1 gray, 3 packed RGB)     |
-  | 0x50 | u32  | packing flag (checked ==1 for color)       |
-  | 0x60 | u32  | resolution/mode (RemoveShadow: min-lines)  |
+  | off  | type | meaning                                   |
+  | ---- | ---- | ----------------------------------------- |
+  | 0x00 | u64  | struct/header size = 0x68                 |
+  | 0x08 | u64  | pixel data pointer                        |
+  | 0x20 | u64  | width (pixels)                            |
+  | 0x28 | u64  | height (lines)                            |
+  | 0x30 | u64  | bytes per line (stride)                   |
+  | 0x38 | u64  | total buffer length (bytes)               |
+  | 0x40 | u64  | bits/sample context (x bpp compared to 7) |
+  | 0x48 | u64  | bytes per pixel (1 gray, 3 packed RGB)    |
+  | 0x50 | u32  | packing flag (checked ==1 for color)      |
+  | 0x60 | u32  | resolution/mode (RemoveShadow: min-lines) |
 
 - Each processing entry also takes a small settings struct
   (`tagREMOVE_SHADOW_INFO`, `tagCUSTOMCOLORGAMMAINFO`, ...) whose layout is
@@ -610,7 +612,7 @@ actual code:
   applies the per-line shading curve using the on-board reference;
   `FilterSimplex`/`NormalFilterSimplex` is the edge-preserving enhancement.
 - **Output** (in the app, via `LLiPm-turbo`): `LLiPm_ImageProcess(in, out,
-  jsonConfig, len)` runs a picojson-configured chain of `IP*` stages
+jsonConfig, len)` runs a picojson-configured chain of `IP*` stages
   (`IPCvtColor`, `IPBrightness`, `IPResCon`, `IPBinarize`, `IPStraighten`,
   `IPAlignment`, `IPRotate`).
 
@@ -630,7 +632,7 @@ Every stage below is now recovered byte-exact from the binaries, not tuned:
 - **Gray tone curve = `DRHachi::GammaBuilderImp::calcGrayGamma` (llipm `0x1fa46`),
   ported exactly** in `gray_gamma_lut()`. It is a linear toe
   `tt*(bright+a-x2)+y2` for shadows joined to a `pow((bright+a)/255, 1/2.2) *
-  (T3*422) + T4` highlight segment. Coefficient tables (index 1..7 = contrast
+(T3*422) + T4` highlight segment. Coefficient tables (index 1..7 = contrast
   preset; 4 is neutral) dumped from `0xa08b0/0xa08f0/0xa0930/0xa1130/0xa13f0`;
   brightness is `(b-128)*128/127`; the pow exponent is `1/2.2` (const `0x9ec30`).
   This replaces the earlier guessed `makeGammaDataforFC` black/white points.
@@ -642,7 +644,7 @@ guided denoise -> `calcGrayGamma`), no Canon libs at runtime.
 
 ### Why our output still isn't COT-crisp (root cause, evidenced)
 
-Feeding our numbers through the *exact* curve settles the question: our faint
+Feeding our numbers through the _exact_ curve settles the question: our faint
 print reads 135 vs paper 166 (reflectance ~0.56 after the 96 dark floor), and
 `calcGrayGamma` maps 0.56-reflectance input to ~190-210 at **every** contrast
 preset — the curve is photographic (tone-preserving) by design and cannot turn
@@ -662,7 +664,7 @@ The gap is **capture quality, not tone**, and the raw shows why directly:
   FPN-correct with the on-board reference the way `AdjustLightCurve` does live.
 
 **A capture-side experiment (superseded by 6.7):** raise the analog gain via
-`0xE1` *before* scanning so the sensor emits a well-exposed, higher-SNR frame.
+`0xE1` _before_ scanning so the sensor emits a well-exposed, higher-SNR frame.
 An auto-exposure loop was built to try this:
 
 - It writes `0xE1 SET ADJUST DATA` with a persisted gain, offset locked to the
@@ -716,7 +718,7 @@ mapping.)
 ### The pipeline that closes the gap (measured against the COT reference)
 
 With capture fixed at firmware default, the remaining gap was noise, and it is
-mostly *structured*: per-column FPN measures ~8 counts std (the dominant term)
+mostly _structured_: per-column FPN measures ~8 counts std (the dominant term)
 vs ~1.9 row FPN and ~13 residual. Removing it robustly (per-column
 median-of-paper normalization, then per-row - `destripe()` in
 `cot_pipeline.py`) tightens the paper distribution from +-16 to +-6 counts,
@@ -734,7 +736,7 @@ usable without mottling. The full recipe in `process()`:
 Result on the reference page: white fraction 81% / dark 3.9% / deep-black 1.9%
 against COT's 92.6 / 2.33 / 0.69, with the table digits fully legible and
 near-black - by far the closest match yet. The photographic `calcGrayGamma`
-path is *not* used for documents: it is tone-preserving by design and leaves
+path is _not_ used for documents: it is tone-preserving by design and leaves
 faint print gray; COT's document look comes from noise removal + the FC
 stretch. `calcGrayGamma` remains available for photo-mode rendering.
 
@@ -746,45 +748,48 @@ commands in **bold** are ones the early raw-pipe scan did NOT issue (they were
 recovered and are all reproduced by the shipped path, 6.7.2).
 
 `CCanoDRDS::PrepareScan` (host-side, before any command):
-  - reads all capabilities, then calls **`_MakeGammaTable`** (per-channel tone
-    LUT built on the host from the brightness/contrast/gamma UI values).
+
+- reads all capabilities, then calls **`_MakeGammaTable`** (per-channel tone
+  LUT built on the host from the brightness/contrast/gamma UI values).
 
 `CCanoDR::StartScan(tagScanParam*)`:
-  1. `ExecInquiry` -> `ExecTestUnitReady` -> `ExecRequestSense`/`DecodeSense`
-  2. `ExecInquiryEx` (SDeviceCapabilty)
-  3. `ExecObjectPosition` (feed/position the sheet)
-  4. `ExecRead` (a priming read)
-  5. **`AdjustLight()`** - the calibration pre-scan (see below)
-  6. `ExecSetWindow`
-  7. **`ExecDefineScanMode` x3** (opcode **0xD6**) - three parameter pages
-     (modes 0,1,2) built from `tagScanParam` fields: mode 0 = image geometry,
-     mode 1 = functional flags (deskew/duplex/dropout - bytes 0x34/0x30/0x31/
-     0x3b/0x8a4/0x8a7/0x8a9 of tagScanParam), mode 2 = color/side.
-  8. `ExecRequestSense` -> `ProtectImageBuffer`
+
+1. `ExecInquiry` -> `ExecTestUnitReady` -> `ExecRequestSense`/`DecodeSense`
+2. `ExecInquiryEx` (SDeviceCapabilty)
+3. `ExecObjectPosition` (feed/position the sheet)
+4. `ExecRead` (a priming read)
+5. **`AdjustLight()`** - the calibration pre-scan (see below)
+6. `ExecSetWindow`
+7. **`ExecDefineScanMode` x3** (opcode **0xD6**) - three parameter pages
+   (modes 0,1,2) built from `tagScanParam` fields: mode 0 = image geometry,
+   mode 1 = functional flags (deskew/duplex/dropout - bytes 0x34/0x30/0x31/
+   0x3b/0x8a4/0x8a7/0x8a9 of tagScanParam), mode 2 = color/side.
+8. `ExecRequestSense` -> `ProtectImageBuffer`
 
 `CCanoDR::AdjustLight()` (opcode-level calibration, runs every scan):
-  `ExecGetMemory(0xD5)` -> **`ExecSetAdjustData(0xE1)`** -> `ExecSetWindow` ->
-  **`ExecDefineScanMode` x2** -> `ExecScan` -> `ExecRead` -> `ExecObjectPosition`.
-  So the sensor gain/offset the firmware uses is (re)solved live from a fresh
-  internal strip read each scan - our static `0xE1` guess can't match it.
+`ExecGetMemory(0xD5)` -> **`ExecSetAdjustData(0xE1)`** -> `ExecSetWindow` ->
+**`ExecDefineScanMode` x2** -> `ExecScan` -> `ExecRead` -> `ExecObjectPosition`.
+So the sensor gain/offset the firmware uses is (re)solved live from a fresh
+internal strip read each scan - our static `0xE1` guess can't match it.
 
 `CCanoDR::ScanPage`: `ExecScan(0x1B)` -> `ExecRequestSense`/`DecodeSense`, then
 `ReadImage`/`ReadLines` drain via `ExecRead(0x28)`.
 
 Host image pipeline (`CCanoDR::ImageProcessing`, all in `LLiPmDRP215`, the
 `Cei::LLiPm::DRHachi` namespace; symbolicated call order via `otool -tV`):
-  `CImg::createImg` (alloc) -> `AdjustLightFirst/Fix/Next/Last(tagADJUSTINFO,
+`CImg::createImg` (alloc) -> `AdjustLightFirst/Fix/Next/Last(tagADJUSTINFO,
   side, ref, reflen)` (shading from the device reference) ->
-  `FilterDuplexFirst/Middle/Last(tagFILTERDUPLEXINFO)` (duplex compositing) ->
-  `FilterSimplexFirst/Middle/Last` + `NormalFilterSimplex(tagFILTERSIMPLEXINFO,
+`FilterDuplexFirst/Middle/Last(tagFILTERDUPLEXINFO)` (duplex compositing) ->
+`FilterSimplexFirst/Middle/Last` + `NormalFilterSimplex(tagFILTERSIMPLEXINFO,
   bool)` (the enhancement/denoise). `tagFILTERSIMPLEXINFO` embeds several
-  0x68-byte `tagIMAGEINFO` sub-blocks (offsets +8, +0x70, +0xd8, +0x188).
+0x68-byte `tagIMAGEINFO` sub-blocks (offsets +8, +0x70, +0xd8, +0x188).
 
 **Container wire format** (confirmed via `SetupCommandContainer`/
 `SetupDataContainer`, matches our working SET WINDOW/SCAN path):
-  - command container: header `90 01 00 14 00 01 90 00`, opcode at byte 0x0c.
-  - data-out container: big-endian `(len+8)` at bytes 0..3, then `00 02 b0 00`,
-    then the parameter page at byte 0x0c.
+
+- command container: header `90 01 00 14 00 01 90 00`, opcode at byte 0x0c.
+- data-out container: big-endian `(len+8)` at bytes 0..3, then `00 02 b0 00`,
+  then the parameter page at byte 0x0c.
 
 **Why the remaining exact bytes need a live capture, not more disassembly:** the
 `0xD6` parameter pages and the `_MakeGammaTable` contents are computed at runtime
@@ -814,11 +819,11 @@ The startup `0x3B` burst is **not** calibration - the INDATA responses decode to
 COT loading its OCR/app resources from firmware. Ruled out.
 
 Exact per-page choreography (deduped):
-  `READ 0x8b` (status) -> `OBJECT_POSITION 31 01` (feed) -> `READ 0x8c` (calib)
-  -> `SET_ADJUST 0xE1` [40B] -> `SET_WINDOW 0x24` [52B, 12-bit] ->
-  `DEFINE_SCAN_MODE 0xD6` x3 [20B: markers 0e30, 0e32+`0201..40`, 0e36] ->
-  `SCAN 0x1B` (2-window list) -> `READ 0x28` image in `0x02cdc0`-byte bands ->
-  `OBJECT_POSITION 31 00` (eject).
+`READ 0x8b` (status) -> `OBJECT_POSITION 31 01` (feed) -> `READ 0x8c` (calib)
+-> `SET_ADJUST 0xE1` [40B] -> `SET_WINDOW 0x24` [52B, 12-bit] ->
+`DEFINE_SCAN_MODE 0xD6` x3 [20B: markers 0e30, 0e32+`0201..40`, 0e36] ->
+`SCAN 0x1B` (2-window list) -> `READ 0x28` image in `0x02cdc0`-byte bands ->
+`OBJECT_POSITION 31 00` (eject).
 
 Workflow to reproduce byte-exact: quit COT ->
 `sudo .venv/bin/python tools/pipe_sniffer.py --slice disk8s1` (atomic payload
@@ -910,16 +915,51 @@ pages (3 sheets in -> pages 1 and 3 out). The driver-binary call structure
 (`StartScan` once / `ScanPage` per sheet) describes Canon's app layering,
 not the wire protocol - the sniffer trace is authoritative.
 
+### 6.7.4 Calibration caching (instant scan, VERIFIED on hardware)
+
+The setup phase splits cleanly, and one structural fact enables caching: the
+feed (`OBJECT_POSITION 01`, issuance 42 of 195) is the ONLY setup command
+that needs paper. The 9 AGC cycles image the scanner's internal dark/white
+references stationary, so the whole calibration block - cycles plus shading
+readback (issuances 43-178) - runs fine with an EMPTY feeder, and the
+converged register + shading state persists in the device for as long as it
+stays powered and claimed. `CotScanner` slices the bundled sequence into:
+
+- **arm** (0-41): the pre-feed arming reads (TUR / INQUIRY / `READ
+  0x84/0x8b/0x8c` loops)
+- **feed** (42): `OBJECT_POSITION 01`
+- **calibration** (43-178): 9 AGC cycles + firmware shading readback
+- **final window** (179-183): `SET_WINDOW` x2, `DEFINE_SCAN_MODE` x3
+- **document scan** (184+): `SCAN 00 01` + the 1 MiB drain stream
+
+`warm_calibrate()` runs arm + calibration with no feed;
+`scan_batch(use_cached_calibration=True)` then runs arm -> feed -> final
+window -> document scan, skipping the cycles and the ~600 KiB shading
+readback entirely. Time-to-first-feed drops from ~60-90 s to a few seconds.
+
+The HTTP service builds on this: a background calibrator claims the device
+at startup and re-runs `warm_calibrate()` whenever the calibration is older
+than `--calib-interval` seconds (default 300), so gains never drift far from
+the LED's current operating point. `/scan` defaults to
+`?calibration=cached` (falling back to the full choreography if nothing is
+warm yet) and, if a background calibration is mid-flight, waits for it and
+starts the moment it finishes; `?calibration=full` runs the complete
+per-scan choreography (useful for A/B quality comparison - responses carry
+`X-Calibration` / `X-Calibration-Age` headers). Between calibration cycles
+the calibrator refreshes a host-side paper hint, so `/status` keeps
+reporting the feeder state as if the scanner were idle while a calibration
+holds the pipe.
+
+Hardware verification: the firmware accepts the calibration block with an
+empty feeder (startup warm calibration, ~60 s, `paper_present` false
+throughout), and a subsequent cached-calibration scan fed immediately with
+full output quality. Known drift consideration: gains move with LED
+warm-up/temperature, which the periodic refresh bounds; a single-cycle
+refresh variant (feed -> one dark + one white cycle -> scan) exists as a
+fallback design should no-feed calibration ever misbehave.
+
 ## 7. Open questions / future experiments
 
-0. **Calibration caching (instant scan).** The AGC cycles converge to plain
-   register values (offsets `0a/11`, gains `92/95`, per-channel targets). A
-   cached-calibration scan would: feed -> ONE dark + ONE white reference
-   cycle (keeps the firmware's shading fresh, verifies drift via the white
-   measurement) -> final scan, cutting the ~12 s preamble to ~2 s. A
-   zero-cycle variant (send converged 0xE1, scan immediately) is worth
-   trying; risk is stale firmware shading (vertical streaks). Gains drift
-   with LED warm-up/temperature, so cached values need a tolerance check.
 1. **`SAdjustInfo` field semantics + current/default gain** (6.5 step 4): confirm
    which bytes are gain vs offset and the power-on default `curGain` before
    issuing the `0xE1` write. First validate by dumping the 0x10080000 reference

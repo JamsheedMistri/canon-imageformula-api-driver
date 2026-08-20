@@ -309,19 +309,18 @@ parameters: `black_pt`, `white_pt`, `paper_target`, `sharpen`). The verified
 defaults match a CaptureOnTouch reference scan; validate changes against a COT
 scan of the same page.
 
-### Faster scans (the big open item)
-Right now every page runs the full ~9-cycle calibration (~60-90 s/page). The
-gains converge to plain register values. Two experiments, in
-`docs/protocol.md` §7.0:
-- **Cached single-cycle calibration:** feed -> one dark + one white reference
-  cycle (keeps firmware shading fresh, verifies drift) -> final scan. Should
-  cut the preamble dramatically.
-- **Zero-cycle instant scan:** send the converged `0xE1` values and scan
-  immediately. Risk: stale firmware shading -> vertical streaks. Gains drift
-  with LED warm-up/temperature, so cached values need a tolerance check.
-To try these, edit the choreography the scanner runs - see how `cot_scan.py`
-iterates `self._seq`; you'd build a shorter sequence rather than replaying all
-195 issuances.
+### Instant scans (calibration caching)
+The full choreography spends most of its ~60-90 s preamble on the 9-cycle
+AGC calibration + shading readback. Because the feed is the only setup
+command that needs paper, that whole block runs with an empty feeder and its
+converged state persists in the powered device.
+`CotScanner.warm_calibrate()` runs it standalone;
+`scan_batch(use_cached_calibration=True)` then goes straight to feed ->
+window setup -> document scan. The service keeps the calibration warm in the
+background (at startup and every `--calib-interval` seconds, default 300),
+`/scan?calibration=cached` (the default) rides it, and `?calibration=full`
+runs the complete per-scan choreography when you want to compare quality.
+Verified on hardware; details in `docs/protocol.md` §6.7.4.
 
 ### Re-capture the choreography (e.g. different DPI / color mode)
 1. Quit CaptureOnTouch, load a page.

@@ -12,8 +12,10 @@ The sequence ships as package data (``data/cot_sequence.json``, generated once
 from a sniffer trace by the replay tooling) so the library has no external
 dependency. The SET_ADJUST gain trajectory in it is the closed-loop search COT
 ran on this device; replaying it verbatim reproduces COT's capture quality.
-Live AGC (recomputing gains from the READ 0x8C measurements) and cached
-single-cycle calibration are future work - see protocol.md section 7.0.
+The setup is further split into arm / feed / calibration / final-window
+phases: ``warm_calibrate()`` refreshes the device's calibration with an empty
+feeder, and ``scan_batch(use_cached_calibration=True)`` rides that state for
+a near-instant scan (protocol.md 6.7.4).
 
 Requires root (raw block-device access):
 
@@ -117,6 +119,45 @@ class CotScanner:
                   and r["payload_bytes"] == b"\x00\x01")
         self._setup_seq = self._seq[:doc]
         self._page_seq = self._seq[doc:]
+        # Finer split of the setup for calibration caching (protocol.md
+        # 6.7.4).
+        # The feed (OBJECT_POSITION 01) is the ONLY setup command that needs
+        # paper; the calibration cycles image the internal dark/white
+        # references without motion, so they can run with an empty feeder:
+        #   arm   = pre-feed arming reads (TUR/INQUIRY/READ 84/8b/8c)
+        #   feed  = OBJECT_POSITION 01
+        #   calib = 9 AGC cycles + firmware shading readback (0x3B block)
+        #   final window = SET_WINDOW/DEFINE for the document SCAN 00 01
+        feed = next(i for i, r in enumerate(self._seq)
+                    if r["cdb_bytes"][0] == 0x31
+                    and r["cdb_bytes"][1] == 0x01)
+        last_shading = max(i for i, r in enumerate(self._seq)
+                           if r["cdb_bytes"][0] == 0x3B)
+        self._arm_seq = self._seq[:feed]
+        self._feed_cmd = self._seq[feed]
+        self._calib_seq = self._seq[feed + 1:last_shading + 1]
+        self._final_window_seq = self._seq[last_shading + 1:doc]
+        # Chunk the calibration block at cycle boundaries (each AGC cycle ends
+        # with OBJECT_POSITION 00; the shading readback rides in the last
+        # chunk) so warm_calibrate() can refresh the paper hint between
+        # cycles without interleaving commands inside a cycle.
+        self._calib_cycles: list[list[dict]] = []
+        chunk: list[dict] = []
+        for r in self._calib_seq:
+            chunk.append(r)
+            if r["cdb_bytes"][0] == 0x31 and r["cdb_bytes"][1] == 0x00:
+                self._calib_cycles.append(chunk)
+                chunk = []
+        if chunk:
+            self._calib_cycles.append(chunk)
+        #: wall-clock time of the last completed calibration (warm or full),
+        #: None until one has run in this session.
+        self.last_calibrated: Optional[float] = None
+        #: last observed feeder state (updated by every paper_present() call,
+        #: including the between-cycle checks during warm_calibrate), readable
+        #: without touching the device - lets the service report paper status
+        #: while a calibration holds the pipe.
+        self.paper_hint: Optional[bool] = None
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -174,8 +215,11 @@ class CotScanner:
         st, data = self.pipe.exec_read(CDB_PAPER_STATUS, 1)
         if scsi_status(st) != 0:
             self._sense()
+            self.paper_hint = False
             return False
-        return bool(data and data[0] == 0x01)
+        present = bool(data and data[0] == 0x01)
+        self.paper_hint = present
+        return present
 
     # -- scanning ----------------------------------------------------------
 
@@ -232,8 +276,34 @@ class CotScanner:
         + window/mode setup). Leaves the first sheet staged, ready for the
         document SCAN."""
         self._run(self._setup_seq, bytearray())
+        self.last_calibrated = time.time()
 
-    def scan_page(self) -> bytes:
+    def warm_calibrate(self) -> None:
+        """Run the AGC calibration cycles + shading readback WITHOUT feeding.
+
+        Safe with an empty feeder: the 9 cycles image the scanner's internal
+        dark (SCAN ``ff ff``) and white (SCAN ``fe fe``) references without
+        paper motion, and the per-cycle ``OBJECT_POSITION 00`` only logs sense
+        on failure. The converged registers + firmware shading tables persist
+        in the device while it stays claimed, so a later
+        :meth:`scan_batch(use_cached_calibration=True) <scan_batch>` can go
+        straight to feed + document scan (protocol.md 6.7.4).
+        """
+        self._run(self._arm_seq, bytearray())
+        for cycle in self._calib_cycles:
+            self._run(cycle, bytearray())
+            self.paper_present()     # keep the paper hint fresh (~every 5 s)
+        self.last_calibrated = time.time()
+
+    @property
+    def calibration_age(self) -> Optional[float]:
+        """Seconds since the last calibration, or None if never calibrated
+        in this session."""
+        if self.last_calibrated is None:
+            return None
+        return time.time() - self.last_calibrated
+
+    def scan_page(self, *, use_cached_calibration: bool = False) -> bytes:
         """Scan a single page (a batch of one - same streaming path as
         :meth:`scan_batch`).
 
@@ -241,7 +311,8 @@ class CotScanner:
         (R/G/B at 600x300 dpi) - decode with :mod:`r10.render`.
         Raises :class:`NoPaperError` if the feeder is empty.
         """
-        pages = list(self.scan_batch(max_pages=1))
+        pages = list(self.scan_batch(
+            max_pages=1, use_cached_calibration=use_cached_calibration))
         if not pages:
             raise ScsiError("scan produced no image data")
         return pages[0]
@@ -276,9 +347,17 @@ class CotScanner:
                 self.log(f"READ #{i}: {chunk} B")
             time.sleep(self.pace)
 
-    def scan_batch(self, max_pages: int = 10) -> Iterator[bytes]:
+    def scan_batch(self, max_pages: int = 10, *,
+                   use_cached_calibration: bool = False) -> Iterator[bytes]:
         """Scan every sheet in the feeder (up to ``max_pages``), yielding one
         raw frame per sheet.
+
+        With ``use_cached_calibration=True`` (and a prior :meth:`calibrate` or
+        :meth:`warm_calibrate` in this session) the per-batch AGC calibration
+        and shading readback are skipped entirely: arming reads -> feed ->
+        final window setup -> document SCAN. Time-to-first-feed drops from
+        ~60-90 s to a few seconds; the scanner reuses the register/shading
+        state converged by the last calibration.
 
         Byte-for-byte the choreography COT uses for ADF batches (captured in
         ``captures/cot_trace_multipage.jsonl``): calibrate once, issue SCAN
@@ -305,7 +384,14 @@ class CotScanner:
         page_break = self._page_seq[big[0] + 1:big[1]]   # sense + 0x80/0xa1
         tail = self._page_seq[big[1] + 1:]               # final sense + paper
 
-        self.calibrate()                 # feed sheet 1 + AGC calibration, once
+        if use_cached_calibration and self.last_calibrated is not None:
+            self.log(f"using cached calibration "
+                     f"({self.calibration_age:.0f} s old)")
+            self._run(self._arm_seq, bytearray())
+            self._run([self._feed_cmd], bytearray())   # feed sheet 1
+            self._run(self._final_window_seq, bytearray())
+        else:
+            self.calibrate()             # feed sheet 1 + AGC calibration, once
         self._run(scan_cmds, bytearray())
         for page in range(max_pages):
             image = bytearray()
